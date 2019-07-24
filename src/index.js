@@ -1,4 +1,6 @@
-'use strict';
+import shoppingList from './shopping-list';
+import $ from 'jquery';
+import cuid from 'cuid';
 /* global shoppingList, cuid */
 
 // eslint-disable-next-line no-unused-vars

@@ -1,15 +1,11 @@
-'use strict';
-/* global store, cuid */
-
-// eslint-disable-next-line no-unused-vars
 const shoppingList = (function(){
 
   function generateItemElement(item) {
     let itemTitle = `<span class="shopping-item shopping-item__checked">${item.name}</span>`;
     if (!item.checked) {
       itemTitle = `
-        <form class="js-edit-item">
-          <input class="shopping-item" type="text" value="${item.name}" />
+        <form id="js-edit-item">
+          <input class="shopping-item type="text" value="${item.name}" />
         </form>
       `;
     }
@@ -37,14 +33,14 @@ const shoppingList = (function(){
   
   function render() {
     // Filter item list if store prop is true by item.checked === false
-    let items = [ ...store.items ];
+    let items = store.items;
     if (store.hideCheckedItems) {
-      items = items.filter(item => !item.checked);
+      items = store.items.filter(item => !item.checked);
     }
   
     // Filter item list if store prop `searchTerm` is not empty
     if (store.searchTerm) {
-      items = items.filter(item => item.name.includes(store.searchTerm));
+      items = store.items.filter(item => item.name.includes(store.searchTerm));
     }
   
     // render the shopping list in the DOM
@@ -56,25 +52,17 @@ const shoppingList = (function(){
   }
   
   
-  function addItemToShoppingList(itemName) {
-    store.items.push({ id: cuid(), name: itemName, checked: false });
-  }
-  
   function handleNewItemSubmit() {
     $('#js-shopping-list-form').submit(function (event) {
       event.preventDefault();
       const newItemName = $('.js-shopping-list-entry').val();
       $('.js-shopping-list-entry').val('');
-      addItemToShoppingList(newItemName);
-      render();
+      api.createItem(newItemName, (newItem) => {
+        store.addItem(newItem);
+        render();
+      });
     });
   }
-  
-  function toggleCheckedForListItem(id) {
-    const foundItem = store.items.find(item => item.id === id);
-    foundItem.checked = !foundItem.checked;
-  }
-  
   
   function getItemIdFromElement(item) {
     return $(item)
@@ -85,55 +73,43 @@ const shoppingList = (function(){
   function handleItemCheckClicked() {
     $('.js-shopping-list').on('click', '.js-item-toggle', event => {
       const id = getItemIdFromElement(event.currentTarget);
-      toggleCheckedForListItem(id);
-      render();
+      const item = store.findById(id);
+      api.updateItem(id, { checked: !item.checked }, () => {
+        store.findAndUpdate(id, { checked: !item.checked });
+        render();
+      });
     });
   }
-  
-  function deleteListItem(id) {
-    const index = store.items.findIndex(item => item.id === id);
-    store.items.splice(index, 1);
-  }
-  
-  function editListItemName(id, itemName) {
-    const item = store.items.find(item => item.id === id);
-    item.name = itemName;
-  }
-  
-  function toggleCheckedItemsFilter() {
-    store.hideCheckedItems = !store.hideCheckedItems;
-  }
-  
-  function setSearchTerm(val) {
-    store.searchTerm = val;
-  }
-  
   
   function handleDeleteItemClicked() {
     // like in `handleItemCheckClicked`, we use event delegation
     $('.js-shopping-list').on('click', '.js-item-delete', event => {
       // get the index of the item in store.items
       const id = getItemIdFromElement(event.currentTarget);
-      // delete the item
-      deleteListItem(id);
-      // render the updated shopping list
-      render();
+      // find the item
+      const item = store.findById(id);
+      api.deleteItem(id, () => {
+        store.findAndDelete(id);
+        render();
+      });
     });
   }
   
   function handleEditShoppingItemSubmit() {
-    $('.js-shopping-list').on('submit', '.js-edit-item', event => {
+    $('.js-shopping-list').on('submit', '#js-edit-item', event => {
       event.preventDefault();
       const id = getItemIdFromElement(event.currentTarget);
       const itemName = $(event.currentTarget).find('.shopping-item').val();
-      editListItemName(id, itemName);
-      render();
+      api.updateItem(id, {name: itemName}, () => {
+        store.findAndUpdate(id, {name: itemName});
+        render();
+      });
     });
   }
   
   function handleToggleFilterClick() {
     $('.js-filter-checked').click(() => {
-      toggleCheckedItemsFilter();
+      store.toggleCheckedFilter();
       render();
     });
   }
@@ -141,7 +117,7 @@ const shoppingList = (function(){
   function handleShoppingListSearch() {
     $('.js-shopping-list-search-entry').on('keyup', event => {
       const val = $(event.currentTarget).val();
-      setSearchTerm(val);
+      store.setSearchTerm(val);
       render();
     });
   }
@@ -157,7 +133,7 @@ const shoppingList = (function(){
 
   // This object contains the only exposed methods from this module:
   return {
-    render,
-    bindEventListeners
+    render: render,
+    bindEventListeners: bindEventListeners,
   };
 }());
